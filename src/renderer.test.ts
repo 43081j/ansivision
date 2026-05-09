@@ -22,14 +22,35 @@ const cursorMoveY = (n: number): CODE => ({
 
 const saveCursor = (): CODE => ({
   type: 'ESC',
-  command: '8',
+  command: '7',
   raw: '',
   params: [],
   pos: 0,
 });
 const restoreCursor = (): CODE => ({
   type: 'ESC',
-  command: '7',
+  command: '8',
+  raw: '',
+  params: [],
+  pos: 0,
+});
+const index = (): CODE => ({
+  type: 'ESC',
+  command: 'D',
+  raw: '',
+  params: [],
+  pos: 0,
+});
+const nextLine = (): CODE => ({
+  type: 'ESC',
+  command: 'E',
+  raw: '',
+  params: [],
+  pos: 0,
+});
+const reverseIndex = (): CODE => ({
+  type: 'ESC',
+  command: 'M',
   raw: '',
   params: [],
   pos: 0,
@@ -701,6 +722,54 @@ suite('Renderer', () => {
       renderer.write(text('hello'));
       renderer.write(cursorColumn(0));
       assert.deepEqual(renderer.cursor, [0, 0]);
+    });
+
+    test('index moves cursor down one row preserving column', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\nworld'));
+      renderer.write(cursorMoveY(-1));
+      renderer.write(cursorMoveX(-3));
+      renderer.write(index());
+      assert.deepEqual(renderer.cursor, [2, 1]);
+    });
+
+    test('index extends buffer when at the bottom', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello'));
+      renderer.write(index());
+      assert.deepEqual(renderer.cursor, [5, 1]);
+      assert.deepEqual(renderer.frames, ['hello\n']);
+    });
+
+    test('next line moves to start of next row', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\nworld'));
+      renderer.write(cursorMoveY(-1));
+      renderer.write(cursorMoveX(-2));
+      renderer.write(nextLine());
+      assert.deepEqual(renderer.cursor, [0, 1]);
+    });
+
+    test('next line extends buffer when at the bottom', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello'));
+      renderer.write(nextLine());
+      assert.deepEqual(renderer.cursor, [0, 1]);
+      assert.deepEqual(renderer.frames, ['hello\n']);
+    });
+
+    test('reverse index moves cursor up one row preserving column', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\nworld'));
+      renderer.write(reverseIndex());
+      assert.deepEqual(renderer.cursor, [5, 0]);
+    });
+
+    test('reverse index at top is a no-op', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello'));
+      renderer.write(reverseIndex());
+      assert.deepEqual(renderer.cursor, [5, 0]);
     });
 
     test('can save and restore cursor', () => {

@@ -18,6 +18,7 @@ suite('isCursorCommand', () => {
     { type: 'ESC', command: '8', raw: '', params: [], pos: 0 },
     { type: 'DEC', command: 'l', raw: '', params: [], pos: 0 },
     { type: 'DEC', command: 'h', raw: '', params: [], pos: 0 },
+    { type: 'ESC', command: 'D', raw: '', params: [], pos: 0 },
   ] as CODE[])('should return true for cursor command %o', (code) => {
     assert.isTrue(isCursorCommand(code));
   });
@@ -31,8 +32,6 @@ suite('isCursorCommand', () => {
     { type: 'CSI', command: 'm', raw: '', params: [], pos: 0 },
     // full reset
     { type: 'ESC', command: 'c', raw: '', params: [], pos: 0 },
-    // index (scroll)
-    { type: 'ESC', command: 'D', raw: '', params: [], pos: 0 },
     // unknown DEC
     { type: 'DEC', command: 'p', raw: '', params: [], pos: 0 },
     // plain text

@@ -76,6 +76,14 @@ export class Renderer implements Iterable<string> {
     this.#cursorY = Math.min(this.#buffer.length - 1, this.#cursorY + count);
   }
 
+  #cursorDownAppend(): void {
+    const newY = this.#cursorY + 1;
+    while (this.#buffer.length <= newY) {
+      this.#buffer.push('');
+    }
+    this.#cursorY = newY;
+  }
+
   #cursorTo(x: number, y: number): void {
     this.#cursorY = Math.max(0, Math.min(this.#buffer.length - 1, y));
     this.#cursorX = Math.max(0, Math.min(this.line.length, x));
@@ -146,10 +154,17 @@ export class Renderer implements Iterable<string> {
       return;
     }
     if (code.type === 'ESC') {
-      if (code.command === '8') {
+      if (code.command === '7') {
         this.#saveCursor();
-      } else if (code.command === '7') {
+      } else if (code.command === '8') {
         this.#restoreCursor();
+      } else if (code.command === 'D') {
+        this.#cursorDownAppend();
+      } else if (code.command === 'E') {
+        this.#cursorX = 0;
+        this.#cursorDownAppend();
+      } else if (code.command === 'M') {
+        this.#cursorUp(1);
       }
       return;
     }
