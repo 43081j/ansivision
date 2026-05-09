@@ -37,7 +37,7 @@ export class Renderer {
     return this.#buffer[this.#cursorY] || '';
   }
 
-  changeFrame(delta: number): void {
+  stepFrame(delta: number): void {
     const newFrame = Math.max(
       0,
       Math.min(this.#frames.length - 1, this.#currentFrame + delta),
@@ -46,49 +46,49 @@ export class Renderer {
   }
 
   nextFrame(): void {
-    this.changeFrame(1);
+    this.stepFrame(1);
   }
 
   previousFrame(): void {
-    this.changeFrame(-1);
+    this.stepFrame(-1);
   }
 
   goToFrame(index: number): void {
     this.#currentFrame = Math.max(0, Math.min(this.#frames.length - 1, index));
   }
 
-  saveCursor(): void {
+  #saveCursor(): void {
     this.#savedCursor = [this.#cursorX, this.#cursorY];
   }
 
-  restoreCursor(): void {
+  #restoreCursor(): void {
     if (this.#savedCursor) {
-      this.cursorTo(this.#savedCursor[0], this.#savedCursor[1]);
+      this.#cursorTo(this.#savedCursor[0], this.#savedCursor[1]);
     }
   }
 
-  cursorUp(count: number): void {
+  #cursorUp(count: number): void {
     this.#cursorY = Math.max(0, this.#cursorY - count);
   }
 
-  cursorDown(count: number): void {
+  #cursorDown(count: number): void {
     this.#cursorY = Math.min(this.#buffer.length - 1, this.#cursorY + count);
   }
 
-  cursorTo(x: number, y: number): void {
+  #cursorTo(x: number, y: number): void {
     this.#cursorY = Math.max(0, Math.min(this.#buffer.length - 1, y));
     this.#cursorX = Math.max(0, Math.min(this.line.length - 1, x));
   }
 
-  cursorForward(count: number): void {
+  #cursorForward(count: number): void {
     this.#cursorX = Math.min(this.line.length - 1, this.#cursorX + count);
   }
 
-  cursorBackward(count: number): void {
+  #cursorBackward(count: number): void {
     this.#cursorX = Math.max(0, this.#cursorX - count);
   }
 
-  writeText(text: string): void {
+  #writeText(text: string): void {
     const parts = text.split('\n');
 
     if (parts.length === 0) {
@@ -106,23 +106,23 @@ export class Renderer {
         if (isFirst) {
           const prefix = existingLine.slice(0, this.#cursorX + 1);
           this.#buffer[bufferIndex] = prefix + part;
-          this.cursorForward(part.length);
+          this.#cursorForward(part.length);
         } else if (isLast) {
           const suffix = existingLine.slice(this.#cursorX);
           this.#buffer[bufferIndex] = part + suffix;
-          this.cursorTo(part.length, bufferIndex);
+          this.#cursorTo(part.length, bufferIndex);
         } else {
           this.#buffer[bufferIndex] = part;
-          this.cursorTo(0, bufferIndex);
+          this.#cursorTo(0, bufferIndex);
         }
       } else {
         this.#buffer.push(part);
-        this.cursorTo(0, bufferIndex);
+        this.#cursorTo(0, bufferIndex);
       }
     }
   }
 
-  cursorByCommand(code: CONTROL_CODE): void {
+  #cursorByCommand(code: CONTROL_CODE): void {
     if (code.type === 'DEC' && (code.command === 'l' || code.command === 'h')) {
       // Ignore cursor hide/show
       return;
@@ -133,15 +133,15 @@ export class Renderer {
     }
     if (code.type === 'ESC') {
       if (code.command === '8') {
-        this.saveCursor();
+        this.#saveCursor();
       } else if (code.command === '7') {
-        this.restoreCursor();
+        this.#restoreCursor();
       }
       return;
     }
 
     if (code.command === 'H') {
-      this.cursorTo(
+      this.#cursorTo(
         code.params[0] ? parseInt(code.params[0]) - 1 : 0,
         code.params[1] ? parseInt(code.params[1]) - 1 : 0,
       );
@@ -152,33 +152,33 @@ export class Renderer {
 
     switch (code.command) {
       case 'A':
-        this.cursorUp(multiplier);
+        this.#cursorUp(multiplier);
         break;
       case 'B':
-        this.cursorDown(multiplier);
+        this.#cursorDown(multiplier);
         break;
       case 'C':
-        this.cursorForward(multiplier);
+        this.#cursorForward(multiplier);
         break;
       case 'D':
-        this.cursorBackward(multiplier);
+        this.#cursorBackward(multiplier);
         break;
       case 'E':
-        this.cursorTo(0, this.#cursorY + multiplier);
+        this.#cursorTo(0, this.#cursorY + multiplier);
         break;
       case 'F':
-        this.cursorTo(0, this.#cursorY - multiplier);
+        this.#cursorTo(0, this.#cursorY - multiplier);
         break;
       case 'G':
-        this.cursorTo(multiplier - 1, this.#cursorY);
+        this.#cursorTo(multiplier - 1, this.#cursorY);
         break;
     }
   }
 
-  eraseAll(): void {
+  #eraseAll(): void {
     this.#pushFrame();
     this.#buffer = [];
-    this.cursorTo(0, 0);
+    this.#cursorTo(0, 0);
   }
 
   #pushFrame(): void {
@@ -188,13 +188,13 @@ export class Renderer {
     this.#frames.push(this.#buffer.join('\n'));
   }
 
-  eraseLine(): void {
+  #eraseLine(): void {
     this.#pushFrame();
     this.#buffer[this.#cursorY] = '';
-    this.cursorTo(0, this.#cursorY);
+    this.#cursorTo(0, this.#cursorY);
   }
 
-  eraseToEndOfLine(): void {
+  #eraseToEndOfLine(): void {
     this.#pushFrame();
     const line = this.#buffer[this.#cursorY];
 
@@ -217,51 +217,51 @@ export class Renderer {
       ' '.repeat(this.#cursorX) + line.slice(this.#cursorX);
   }
 
-  eraseToEnd(): void {
+  #eraseToEnd(): void {
     this.#pushFrame();
     this.#frameWritesEnabled = false;
-    this.eraseToEndOfLine();
+    this.#eraseToEndOfLine();
     this.#frameWritesEnabled = true;
     this.#buffer.splice(this.#cursorY + 1);
   }
 
-  eraseToStart(): void {
+  #eraseToStart(): void {
     this.#pushFrame();
     this.#frameWritesEnabled = false;
     this.eraseToStartOfLine();
     this.#frameWritesEnabled = true;
     this.#buffer.splice(0, this.#cursorY);
-    this.cursorTo(this.#cursorX, 0);
+    this.#cursorTo(this.#cursorX, 0);
   }
 
-  eraseByCommand(code: CONTROL_CODE): void {
+  #eraseByCommand(code: CONTROL_CODE): void {
     if (code.type === 'ESC' && code.command === 'c') {
-      this.eraseAll();
+      this.#eraseAll();
       return;
     }
     const flag = code.params[0] ? parseInt(code.params[0]) : 0;
     if (code.command === 'J') {
       switch (flag) {
         case 0:
-          this.eraseToEnd();
+          this.#eraseToEnd();
           break;
         case 1:
-          this.eraseToStart();
+          this.#eraseToStart();
           break;
         case 2:
-          this.eraseAll();
+          this.#eraseAll();
           break;
       }
     } else if (code.command === 'K') {
       switch (flag) {
         case 0:
-          this.eraseToEndOfLine();
+          this.#eraseToEndOfLine();
           break;
         case 1:
           this.eraseToStartOfLine();
           break;
         case 2:
-          this.eraseLine();
+          this.#eraseLine();
           break;
       }
     }
@@ -269,11 +269,11 @@ export class Renderer {
 
   write(code: CODE): void {
     if (isCursorCommand(code)) {
-      this.cursorByCommand(code);
+      this.#cursorByCommand(code);
     } else if (isEraseCommand(code)) {
-      this.eraseByCommand(code);
+      this.#eraseByCommand(code);
     } else if (code.type === 'TEXT') {
-      this.writeText(code.raw);
+      this.#writeText(code.raw);
     }
   }
 }
