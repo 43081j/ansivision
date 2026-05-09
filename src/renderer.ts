@@ -9,6 +9,7 @@ export class Renderer implements Iterable<string> {
   #savedCursor?: [number, number];
   #frameWritesEnabled: boolean = true;
   #currentFrame: number = 0;
+  #skipUntilStringTerminator: boolean = false;
 
   static fromString(input: string): Renderer {
     const ast = parse(input);
@@ -88,41 +89,51 @@ export class Renderer implements Iterable<string> {
     this.#cursorX = Math.max(0, this.#cursorX - count);
   }
 
-  #writeText(text: string): void {
-    const parts = text.split('\n');
-
-    if (parts.length === 0) {
+  #writeChunk(part: string): void {
+    if (!part) {
       return;
     }
+    const bufferIndex = this.#cursorY;
+    const existingLine = this.#buffer[bufferIndex];
 
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i]!;
-      const bufferIndex = this.#cursorY + i;
-      const isFirst = i === 0;
-      const isLast = i === parts.length - 1;
-      const existingLine = this.#buffer[bufferIndex];
+    if (existingLine !== undefined) {
+      const prefix = existingLine.slice(0, this.#cursorX);
+      const suffix = existingLine.slice(this.#cursorX + part.length);
+      this.#buffer[bufferIndex] = prefix + part + suffix;
+      this.#cursorForward(part.length);
+    } else {
+      this.#buffer.push(part);
+      this.#cursorTo(part.length, bufferIndex);
+    }
+  }
 
-      if (existingLine !== undefined) {
-        if (isFirst) {
-          const prefix = existingLine.slice(0, this.#cursorX);
-          const suffix = isLast
-            ? existingLine.slice(this.#cursorX + part.length)
-            : '';
-          this.#buffer[bufferIndex] = prefix + part + suffix;
-          this.#cursorForward(part.length);
-        } else if (isLast) {
-          const suffix = existingLine.slice(this.#cursorX);
-          this.#buffer[bufferIndex] = part + suffix;
-          this.#cursorTo(part.length, bufferIndex);
+  #writeText(text: string): void {
+    let chunk = '';
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i]!;
+
+      if (ch === '\r' || ch === '\n' || ch === '\b') {
+        this.#writeChunk(chunk);
+        chunk = '';
+
+        if (ch === '\r') {
+          this.#cursorX = 0;
+        } else if (ch === '\b') {
+          this.#cursorBackward(1);
         } else {
-          this.#buffer[bufferIndex] = part;
-          this.#cursorTo(0, bufferIndex);
+          const newY = this.#cursorY + 1;
+          while (this.#buffer.length <= newY) {
+            this.#buffer.push('');
+          }
+          this.#cursorTo(this.#cursorX, newY);
         }
       } else {
-        this.#buffer.push(part);
-        this.#cursorTo(part.length, bufferIndex);
+        chunk += ch;
       }
     }
+
+    this.#writeChunk(chunk);
   }
 
   #cursorByCommand(code: CONTROL_CODE): void {
@@ -271,6 +282,31 @@ export class Renderer implements Iterable<string> {
   }
 
   write(code: CODE): void {
+    if (this.#skipUntilStringTerminator) {
+      if (code.type === 'ESC' && code.command === '\\') {
+        this.#skipUntilStringTerminator = false;
+      }
+      return;
+    }
+
+    // Captures some special non-printed sequences
+    // k = window title
+    // P = device control string
+    // X = start of string
+    // ^ = privacy message
+    // _ = application program command
+    if (
+      code.type === 'ESC' &&
+      (code.command === 'k' ||
+        code.command === 'P' ||
+        code.command === 'X' ||
+        code.command === '^' ||
+        code.command === '_')
+    ) {
+      this.#skipUntilStringTerminator = true;
+      return;
+    }
+
     if (isCursorCommand(code)) {
       this.#cursorByCommand(code);
     } else if (isEraseCommand(code)) {
