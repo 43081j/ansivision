@@ -2,7 +2,7 @@ import { Writable } from 'node:stream';
 import { Renderer } from './renderer.js';
 import { parse } from '@ansi-tools/parser';
 
-const renderStreamBrand = Symbol.for('ansi-tools:render-stream');
+const renderStreamBrand = Symbol.for('ansivision:RenderStream');
 
 export class RenderStream extends Writable {
   [renderStreamBrand] = true;
