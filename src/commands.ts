@@ -13,7 +13,12 @@ export const isCursorCommand = (code: CODE): code is CONTROL_CODE => {
         code.command === 'G' ||
         code.command === 'T' ||
         code.command === 'S')) ||
-    (code.type === 'ESC' && (code.command === '8' || code.command === '7')) ||
+    (code.type === 'ESC' &&
+      (code.command === '8' ||
+        code.command === '7' ||
+        code.command === 'D' ||
+        code.command === 'E' ||
+        code.command === 'M')) ||
     (code.type === 'DEC' && (code.command === 'l' || code.command === 'h'))
   );
 };
