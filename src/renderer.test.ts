@@ -194,6 +194,59 @@ suite('Renderer', () => {
     });
   });
 
+  suite('title', () => {
+    test('captures the window title', () => {
+      const renderer = Renderer.fromString('\x1bkmy title\x1b\\');
+      assert.equal(renderer.currentTitle, 'my title');
+    });
+
+    test('defaults to empty string when no title is set', () => {
+      const renderer = Renderer.fromString('hello');
+      assert.equal(renderer.currentTitle, '');
+      assert.deepEqual(
+        renderer.frameObjects.map((f) => f.title),
+        [''],
+      );
+    });
+
+    test('replaces a previously captured title', () => {
+      const renderer = Renderer.fromString('\x1bkfirst\x1b\\\x1bksecond\x1b\\');
+      assert.equal(renderer.currentTitle, 'second');
+    });
+
+    test('snapshots the title alongside each frame', () => {
+      const renderer = Renderer.fromString(
+        '\x1bkone\x1b\\a\x1b[2J\x1bktwo\x1b\\b',
+      );
+      assert.deepEqual(renderer.frameObjects, [
+        { contents: 'a', title: 'one' },
+        { contents: 'b', title: 'two' },
+      ]);
+    });
+
+    test('carries the last title forward to subsequent frames', () => {
+      const renderer = Renderer.fromString('\x1bkonly\x1b\\a\x1b[2Jb');
+      assert.deepEqual(
+        renderer.frameObjects.map((f) => f.title),
+        ['only', 'only'],
+      );
+    });
+
+    test('currentTitle reflects the active frame after navigation', () => {
+      const renderer = Renderer.fromString(
+        '\x1bkone\x1b\\a\x1b[2J\x1bktwo\x1b\\b',
+      );
+      assert.equal(renderer.currentTitle, 'one');
+      renderer.nextFrame();
+      assert.equal(renderer.currentTitle, 'two');
+    });
+
+    test('does not capture text from non-title special sequences', () => {
+      const renderer = Renderer.fromString('\x1bPignored\x1b\\');
+      assert.equal(renderer.currentTitle, '');
+    });
+  });
+
   suite('currentFrame', () => {
     test('defaults to the first frame', () => {
       const renderer = new Renderer();
