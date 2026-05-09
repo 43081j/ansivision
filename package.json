@@ -16,7 +16,8 @@
     "!lib/**/*.test.d.ts"
   ],
   "scripts": {
-    "build": "tsgo",
+    "build:clean": "node -e \"require('fs').rmSync('./lib', { recursive: true, force: true })\"",
+    "build": "npm run build:clean && tsgo",
     "lint:js": "oxlint src",
     "lint:format": "oxfmt --check src",
     "lint": "npm run lint:js && npm run lint:format",
