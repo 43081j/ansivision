@@ -1,15 +1,22 @@
 import { CODE, CONTROL_CODE, parse } from '@ansi-tools/parser';
 import { isCursorCommand, isEraseCommand } from './commands.js';
 
+export interface Frame {
+  contents: string;
+  title: string;
+}
+
 export class Renderer implements Iterable<string> {
   #buffer: string[] = [];
   #cursorX: number = 0;
   #cursorY: number = 0;
-  #frames: string[] = [];
+  #frames: Frame[] = [];
   #savedCursor?: [number, number];
   #frameWritesEnabled: boolean = true;
   #currentFrame: number = 0;
   #skipUntilStringTerminator: boolean = false;
+  #capturingTitle: boolean = false;
+  #title: string = '';
 
   static fromString(input: string): Renderer {
     const ast = parse(input);
@@ -27,7 +34,18 @@ export class Renderer implements Iterable<string> {
   }
 
   get frames(): string[] {
-    return [...this.#frames, this.#buffer.join('\n')];
+    return this.frameObjects.map((frame) => frame.contents);
+  }
+
+  get currentTitle(): string {
+    return this.frameObjects[this.#currentFrame]?.title ?? '';
+  }
+
+  get frameObjects(): Frame[] {
+    return [
+      ...this.#frames,
+      { contents: this.#buffer.join('\n'), title: this.#title },
+    ];
   }
 
   get cursor(): [x: number, y: number] {
@@ -214,7 +232,10 @@ export class Renderer implements Iterable<string> {
     if (!this.#frameWritesEnabled) {
       return;
     }
-    this.#frames.push(this.#buffer.join('\n'));
+    this.#frames.push({
+      contents: this.#buffer.join('\n'),
+      title: this.#title,
+    });
   }
 
   #eraseLine(): void {
@@ -300,6 +321,9 @@ export class Renderer implements Iterable<string> {
     if (this.#skipUntilStringTerminator) {
       if (code.type === 'ESC' && code.command === '\\') {
         this.#skipUntilStringTerminator = false;
+        this.#capturingTitle = false;
+      } else if (this.#capturingTitle && code.type === 'TEXT') {
+        this.#title += code.raw;
       }
       return;
     }
@@ -319,6 +343,10 @@ export class Renderer implements Iterable<string> {
         code.command === '_')
     ) {
       this.#skipUntilStringTerminator = true;
+      if (code.command === 'k') {
+        this.#capturingTitle = true;
+        this.#title = '';
+      }
       return;
     }
 
