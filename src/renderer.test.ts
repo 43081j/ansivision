@@ -149,6 +149,28 @@ suite('Renderer', () => {
       const renderer = Renderer.fromString('hello\nworld\x1b[1;1H!');
       assert.deepEqual(renderer.frames, ['!ello\nworld']);
     });
+
+    test('swallows title sequence', () => {
+      const renderer = Renderer.fromString('a\x1bktitle text\x1b\\b');
+      assert.deepEqual(renderer.frames, ['ab']);
+    });
+
+    test('swallows DCS payload', () => {
+      const renderer = Renderer.fromString('a\x1bP1;2;3payload\x1b\\b');
+      assert.deepEqual(renderer.frames, ['ab']);
+    });
+
+    test('swallows APC payload', () => {
+      const renderer = Renderer.fromString('a\x1b_some apc data\x1b\\b');
+      assert.deepEqual(renderer.frames, ['ab']);
+    });
+
+    test('does not affect text following a completed title sequence', () => {
+      const renderer = Renderer.fromString(
+        'before\x1bkignored\x1b\\after\nnext',
+      );
+      assert.deepEqual(renderer.frames, ['beforeafter\nnext']);
+    });
   });
 
   suite('currentFrame', () => {
@@ -351,6 +373,68 @@ suite('Renderer', () => {
       const renderer = new Renderer();
       renderer.write(text('hello\nworld'));
       assert.deepEqual(renderer.frames, ['hello\nworld']);
+    });
+
+    test('carriage return moves cursor to start of line', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\rJ'));
+      assert.deepEqual(renderer.frames, ['Jello']);
+      assert.deepEqual(renderer.cursor, [1, 0]);
+    });
+
+    test('carriage return without follow-up text leaves buffer intact', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\r'));
+      assert.deepEqual(renderer.frames, ['hello']);
+      assert.deepEqual(renderer.cursor, [0, 0]);
+    });
+
+    test('backspace moves cursor back without erasing', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\b'));
+      assert.deepEqual(renderer.frames, ['hello']);
+      assert.deepEqual(renderer.cursor, [4, 0]);
+    });
+
+    test('backspace then write overwrites the previous character', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\b\bLP'));
+      assert.deepEqual(renderer.frames, ['helLP']);
+      assert.deepEqual(renderer.cursor, [5, 0]);
+    });
+
+    test('backspace at start of line is a no-op', () => {
+      const renderer = new Renderer();
+      renderer.write(text('\bhi'));
+      assert.deepEqual(renderer.frames, ['hi']);
+      assert.deepEqual(renderer.cursor, [2, 0]);
+    });
+
+    test('crlf moves cursor to start of next line', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\r\nworld'));
+      assert.deepEqual(renderer.frames, ['hello\nworld']);
+      assert.deepEqual(renderer.cursor, [5, 1]);
+    });
+
+    test('lone newline preserves cursor column (no implicit cr)', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello\nworld'));
+      assert.deepEqual(renderer.cursor, [5, 1]);
+    });
+
+    test('simulates typing with backspace corrections', () => {
+      const renderer = new Renderer();
+      renderer.write(text('x\by\bzoo'));
+      assert.deepEqual(renderer.frames, ['zoo']);
+      assert.deepEqual(renderer.cursor, [3, 0]);
+    });
+
+    test('overwrites with carriage return and partial text', () => {
+      const renderer = new Renderer();
+      renderer.write(text('hello world\rgoodbye'));
+      assert.deepEqual(renderer.frames, ['goodbyeorld']);
+      assert.deepEqual(renderer.cursor, [7, 0]);
     });
   });
 
