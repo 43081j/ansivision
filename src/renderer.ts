@@ -77,11 +77,11 @@ export class Renderer implements Iterable<string> {
 
   #cursorTo(x: number, y: number): void {
     this.#cursorY = Math.max(0, Math.min(this.#buffer.length - 1, y));
-    this.#cursorX = Math.max(0, Math.min(this.line.length - 1, x));
+    this.#cursorX = Math.max(0, Math.min(this.line.length, x));
   }
 
   #cursorForward(count: number): void {
-    this.#cursorX = Math.min(this.line.length - 1, this.#cursorX + count);
+    this.#cursorX = Math.min(this.line.length, this.#cursorX + count);
   }
 
   #cursorBackward(count: number): void {
@@ -104,8 +104,11 @@ export class Renderer implements Iterable<string> {
 
       if (existingLine !== undefined) {
         if (isFirst) {
-          const prefix = existingLine.slice(0, this.#cursorX + 1);
-          this.#buffer[bufferIndex] = prefix + part;
+          const prefix = existingLine.slice(0, this.#cursorX);
+          const suffix = isLast
+            ? existingLine.slice(this.#cursorX + part.length)
+            : '';
+          this.#buffer[bufferIndex] = prefix + part + suffix;
           this.#cursorForward(part.length);
         } else if (isLast) {
           const suffix = existingLine.slice(this.#cursorX);
@@ -117,7 +120,7 @@ export class Renderer implements Iterable<string> {
         }
       } else {
         this.#buffer.push(part);
-        this.#cursorTo(0, bufferIndex);
+        this.#cursorTo(part.length, bufferIndex);
       }
     }
   }
@@ -205,7 +208,7 @@ export class Renderer implements Iterable<string> {
     this.#buffer[this.#cursorY] = line.slice(0, this.#cursorX);
   }
 
-  eraseToStartOfLine(): void {
+  #eraseToStartOfLine(): void {
     this.#pushFrame();
     const line = this.#buffer[this.#cursorY];
 
@@ -213,8 +216,8 @@ export class Renderer implements Iterable<string> {
       return;
     }
 
-    this.#buffer[this.#cursorY] =
-      ' '.repeat(this.#cursorX) + line.slice(this.#cursorX);
+    const end = Math.min(this.#cursorX + 1, line.length);
+    this.#buffer[this.#cursorY] = ' '.repeat(end) + line.slice(end);
   }
 
   #eraseToEnd(): void {
@@ -228,7 +231,7 @@ export class Renderer implements Iterable<string> {
   #eraseToStart(): void {
     this.#pushFrame();
     this.#frameWritesEnabled = false;
-    this.eraseToStartOfLine();
+    this.#eraseToStartOfLine();
     this.#frameWritesEnabled = true;
     this.#buffer.splice(0, this.#cursorY);
     this.#cursorTo(this.#cursorX, 0);
@@ -258,7 +261,7 @@ export class Renderer implements Iterable<string> {
           this.#eraseToEndOfLine();
           break;
         case 1:
-          this.eraseToStartOfLine();
+          this.#eraseToStartOfLine();
           break;
         case 2:
           this.#eraseLine();
