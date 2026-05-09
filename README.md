@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/logo.webp" alt="ansivision" width="480" />
+</p>
+
 # ansivision
 
 Renders terminal output (i.e. strings containing ANSI codes) into a "rendered"
@@ -25,4 +29,4 @@ for (const frame of rendered) {
 
 ## License
 
-ISC
+MIT
