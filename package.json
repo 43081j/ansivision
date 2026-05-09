@@ -1,6 +1,6 @@
 {
   "name": "ansivision",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Renders strings containing ANSI escape codes to various outputs.",
   "main": "./lib/main.js",
   "type": "module",
