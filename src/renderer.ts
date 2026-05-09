@@ -22,7 +22,7 @@ export class Renderer {
   }
 
   get currentFrame(): string {
-    return this.#frames[this.#currentFrame] ?? '';
+    return this.frames[this.#currentFrame] ?? '';
   }
 
   get frames(): string[] {
@@ -40,7 +40,7 @@ export class Renderer {
   stepFrame(delta: number): void {
     const newFrame = Math.max(
       0,
-      Math.min(this.#frames.length - 1, this.#currentFrame + delta),
+      Math.min(this.frames.length - 1, this.#currentFrame + delta),
     );
     this.#currentFrame = newFrame;
   }
@@ -54,7 +54,7 @@ export class Renderer {
   }
 
   goToFrame(index: number): void {
-    this.#currentFrame = Math.max(0, Math.min(this.#frames.length - 1, index));
+    this.#currentFrame = Math.max(0, Math.min(this.frames.length - 1, index));
   }
 
   #saveCursor(): void {
