@@ -8,6 +8,7 @@ export class Renderer {
   #frames: string[] = [];
   #savedCursor?: [number, number];
   #frameWritesEnabled: boolean = true;
+  #currentFrame: number = 0;
 
   static fromString(input: string): Renderer {
     const ast = parse(input);
@@ -20,6 +21,10 @@ export class Renderer {
     return renderer;
   }
 
+  get currentFrame(): string {
+    return this.#frames[this.#currentFrame] ?? '';
+  }
+
   get frames(): string[] {
     return [...this.#frames, this.#buffer.join('\n')];
   }
@@ -30,6 +35,26 @@ export class Renderer {
 
   get line(): string {
     return this.#buffer[this.#cursorY] || '';
+  }
+
+  changeFrame(delta: number): void {
+    const newFrame = Math.max(
+      0,
+      Math.min(this.#frames.length - 1, this.#currentFrame + delta),
+    );
+    this.#currentFrame = newFrame;
+  }
+
+  nextFrame(): void {
+    this.changeFrame(1);
+  }
+
+  previousFrame(): void {
+    this.changeFrame(-1);
+  }
+
+  goToFrame(index: number): void {
+    this.#currentFrame = Math.max(0, Math.min(this.#frames.length - 1, index));
   }
 
   saveCursor(): void {
