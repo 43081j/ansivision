@@ -27,6 +27,28 @@ for (const frame of rendered) {
 }
 ```
 
+## Usage in tests
+
+Using `renderStringToFrames` to assert on the visual output of a child
+process with vitest:
+
+```ts
+import { test, expect } from "vitest";
+import { renderStringToFrames } from "ansivision";
+import { x } from "tinyexec";
+
+test("renders expected output", async () => {
+  const result = await x('my-command', []);
+
+  const frames = await renderStringToFrames(result.stdout);
+
+  expect(frames).toMatchSnapshot();
+});
+```
+
+> [!NOTE]
+> Many terminal applications will detect if they are running in a non-interactive environment (e.g. a child process) and disable ANSI codes. To ensure that the output contains ANSI codes, you may need to set the `FORCE_COLOR` environment variable to `true` or use a tool to emulate a terminal environment.
+
 ## License
 
 MIT
