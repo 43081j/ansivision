@@ -1,7 +1,7 @@
 import { CODE, CONTROL_CODE, parse } from '@ansi-tools/parser';
 import { isCursorCommand, isEraseCommand } from './commands.js';
 
-export class Renderer {
+export class Renderer implements Iterable<string> {
   #buffer: string[] = [];
   #cursorX: number = 0;
   #cursorY: number = 0;
@@ -275,5 +275,21 @@ export class Renderer {
     } else if (code.type === 'TEXT') {
       this.#writeText(code.raw);
     }
+  }
+
+  [Symbol.iterator](): Iterator<string> {
+    let index = 0;
+    const frames = this.frames;
+
+    return {
+      next(): IteratorResult<string> {
+        const frame = frames[index++];
+        if (frame !== undefined) {
+          return { value: frame, done: false };
+        } else {
+          return { value: '', done: true };
+        }
+      },
+    };
   }
 }

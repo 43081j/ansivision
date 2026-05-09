@@ -1,21 +1,21 @@
-# @ansi-tools/renderer
+# ansivision
 
-Renders strings containing ANSI codes (i.e. terminal output) into a "rendered"
+Renders terminal output (i.e. strings containing ANSI codes) into a "rendered"
 representation, containing each visual frame which would have been displayed.
 
 ## Installation
 
 ```bash
-npm install @ansi-tools/renderer
+npm install ansivision
 ```
 
 ## Usage
 
 ```ts
-import { renderString } from "@ansi-tools/renderer";
+import { renderString } from "ansivision";
 
 const input = "\x1b[31mHello\x1b[0m World";
-const rendered = renderString(input);
+const rendered = await renderString(input);
 
 for (const frame of rendered) {
   // will render frame 1 which is "Hello World"
