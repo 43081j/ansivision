@@ -287,6 +287,18 @@ suite('Renderer', () => {
       renderer.write(text('c'));
       assert.deepEqual(renderer.frames, ['a', 'b', 'c']);
     });
+
+    test('synchronized output (DEC 2026) coalesces frames until reset', () => {
+      const renderer = Renderer.fromString(
+        'foo\x1b[2J\x1b[?2026ha\x1b[2Jb\x1b[2Jc\x1b[?2026l',
+      );
+      assert.deepEqual(renderer.frames, ['foo', 'c', 'c']);
+    });
+
+    test('synchronized output reset snapshots the buffer at flush time', () => {
+      const renderer = Renderer.fromString('foo\x1b[?2026hbar\x1b[?2026lbaz');
+      assert.deepEqual(renderer.frames, ['foobar', 'foobarbaz']);
+    });
   });
 
   suite('cursor', () => {

@@ -12,7 +12,8 @@ export class Renderer implements Iterable<string> {
   #cursorY: number = 0;
   #frames: Frame[] = [];
   #savedCursor?: [number, number];
-  #frameWritesEnabled: boolean = true;
+  #suppressNextPush: boolean = false;
+  #syncMode: boolean = false;
   #currentFrame: number = 0;
   #skipUntilStringTerminator: boolean = false;
   #capturingTitle: boolean = false;
@@ -164,7 +165,14 @@ export class Renderer implements Iterable<string> {
 
   #cursorByCommand(code: CONTROL_CODE): void {
     if (code.type === 'DEC' && (code.command === 'l' || code.command === 'h')) {
-      // Ignore cursor hide/show
+      if (code.params[0] === '2026') {
+        if (code.command === 'h') {
+          this.#syncMode = true;
+        } else {
+          this.#syncMode = false;
+          this.#pushFrame();
+        }
+      }
       return;
     }
     if (code.type === 'CSI' && (code.command === 'T' || code.command === 'S')) {
@@ -229,7 +237,7 @@ export class Renderer implements Iterable<string> {
   }
 
   #pushFrame(): void {
-    if (!this.#frameWritesEnabled) {
+    if (this.#suppressNextPush || this.#syncMode) {
       return;
     }
     this.#frames.push({
@@ -269,17 +277,17 @@ export class Renderer implements Iterable<string> {
 
   #eraseToEnd(): void {
     this.#pushFrame();
-    this.#frameWritesEnabled = false;
+    this.#suppressNextPush = true;
     this.#eraseToEndOfLine();
-    this.#frameWritesEnabled = true;
+    this.#suppressNextPush = false;
     this.#buffer.splice(this.#cursorY + 1);
   }
 
   #eraseToStart(): void {
     this.#pushFrame();
-    this.#frameWritesEnabled = false;
+    this.#suppressNextPush = true;
     this.#eraseToStartOfLine();
-    this.#frameWritesEnabled = true;
+    this.#suppressNextPush = false;
     this.#buffer.splice(0, this.#cursorY);
     this.#cursorTo(this.#cursorX, 0);
   }
