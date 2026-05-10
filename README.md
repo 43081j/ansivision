@@ -7,6 +7,22 @@
 Renders terminal output (i.e. strings containing ANSI codes) into a "rendered"
 representation, containing each visual frame which would have been displayed.
 
+##  Why?
+
+When working with terminal applications, it can be useful to visualize the output
+as it would appear in a terminal, especially when testing. This library provides
+a way to render ANSI strings into their visual representation, allowing you to
+assert on the rendered output in tests or visualize it in other contexts.
+
+A few examples of use cases include:
+
+- Testing the output of a CLI by comparing the rendered frames to
+  snapshots (as opposed to testing raw ANSI strings which can be difficult
+  to read and maintain).
+- Visualizing the output of a terminal application in a web interface or other
+  non-terminal environment.
+- Debugging terminal applications by inspecting the rendered output.
+
 ## Installation
 
 ```bash
