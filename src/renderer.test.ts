@@ -133,8 +133,8 @@ const cursorTo = (x?: number, y?: number): CODE => ({
   command: 'H',
   raw: '',
   params: [
-    x === undefined ? '' : (x + 1).toString(),
     y === undefined ? '' : (y + 1).toString(),
+    x === undefined ? '' : (x + 1).toString(),
   ],
   pos: 0,
 });
