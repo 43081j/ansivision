@@ -197,8 +197,8 @@ export class Renderer implements Iterable<string> {
 
     if (code.command === 'H') {
       this.#cursorTo(
-        code.params[0] ? parseInt(code.params[0]) - 1 : 0,
         code.params[1] ? parseInt(code.params[1]) - 1 : 0,
+        code.params[0] ? parseInt(code.params[0]) - 1 : 0,
       );
       return;
     }
