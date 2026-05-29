@@ -251,6 +251,26 @@ suite('Renderer', () => {
       const renderer = Renderer.fromString('\x1bPignored\x1b\\');
       assert.equal(renderer.currentTitle, '');
     });
+
+    test('captures the window title from an OSC 0 sequence', () => {
+      const renderer = Renderer.fromString('\x1b]0;my title\x07');
+      assert.equal(renderer.currentTitle, 'my title');
+    });
+
+    test('captures the window title from an OSC 2 sequence', () => {
+      const renderer = Renderer.fromString('\x1b]2;my title\x07');
+      assert.equal(renderer.currentTitle, 'my title');
+    });
+
+    test('captures an OSC title terminated by ST', () => {
+      const renderer = Renderer.fromString('\x1b]0;my title\x1b\\');
+      assert.equal(renderer.currentTitle, 'my title');
+    });
+
+    test('ignores OSC 1 (icon name) as a title source', () => {
+      const renderer = Renderer.fromString('\x1b]1;icon name\x07');
+      assert.equal(renderer.currentTitle, '');
+    });
   });
 
   suite('currentFrame', () => {
