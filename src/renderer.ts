@@ -1,6 +1,7 @@
 import { CODE, CONTROL_CODE, parse } from '@ansi-tools/parser';
 import { isCursorCommand, isEraseCommand, isStyleCommand } from './commands.js';
 import {
+  computeStyledFrame,
   computeStyleForParams,
   computeStyleKey,
   createStyleCollection,
@@ -12,6 +13,7 @@ import {
 export interface Frame {
   contents: string;
   title: string;
+  styles: Style[][];
 }
 
 export class Renderer implements Iterable<string> {
@@ -48,6 +50,16 @@ export class Renderer implements Iterable<string> {
     return this.frames[this.#currentFrame] ?? '';
   }
 
+  get currentStyledFrame(): string {
+    const frame = this.frameObjects[this.#currentFrame];
+
+    if (!frame) {
+      return '';
+    }
+
+    return computeStyledFrame(frame.contents, frame.styles);
+  }
+
   get frames(): string[] {
     return this.frameObjects.map((frame) => frame.contents);
   }
@@ -59,7 +71,11 @@ export class Renderer implements Iterable<string> {
   get frameObjects(): Frame[] {
     return [
       ...this.#frames,
-      { contents: this.#buffer.join('\n'), title: this.#title },
+      {
+        contents: this.#buffer.join('\n'),
+        title: this.#title,
+        styles: this.#styleBuffer,
+      },
     ];
   }
 
@@ -306,6 +322,7 @@ export class Renderer implements Iterable<string> {
     this.#frames.push({
       contents: this.#buffer.join('\n'),
       title: this.#title,
+      styles: this.#styleBuffer.map((row) => [...row]),
     });
   }
 

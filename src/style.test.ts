@@ -4,8 +4,11 @@ import {
   computeColorKey,
   computeStyleKey,
   computeStyleForParams,
+  computeStyledFrame,
   createStyleCollection,
   readExtendedColor,
+  styleToParams,
+  styleToSequence,
   DEFAULT_STYLE,
   DEFAULT_STYLE_KEY,
 } from './style.js';
@@ -261,5 +264,136 @@ suite('computeStyleForParams', () => {
     const snapshot = computeStyleKey(input);
     computeStyleForParams(input, ['31', '4']);
     assert.equal(computeStyleKey(input), snapshot);
+  });
+});
+
+suite('styleToParams', () => {
+  test('returns no params for the default style', () => {
+    assert.deepEqual(styleToParams(DEFAULT_STYLE), []);
+  });
+
+  test.each([
+    { key: 'bold', param: '1' },
+    { key: 'dim', param: '2' },
+    { key: 'italic', param: '3' },
+    { key: 'underline', param: '4' },
+    { key: 'blink', param: '5' },
+    { key: 'inverse', param: '7' },
+    { key: 'hidden', param: '8' },
+    { key: 'strikethrough', param: '9' },
+  ] as const)('encodes $key as param $param', ({ key, param }) => {
+    assert.deepEqual(styleToParams(style({ [key]: true })), [param]);
+  });
+
+  test('emits attributes in a stable order', () => {
+    assert.deepEqual(
+      styleToParams(style({ bold: true, underline: true, italic: true })),
+      ['1', '3', '4'],
+    );
+  });
+
+  test('encodes a basic foreground colour', () => {
+    assert.deepEqual(styleToParams(style({ foreground: 1 })), ['31']);
+  });
+
+  test('encodes a basic background colour', () => {
+    assert.deepEqual(styleToParams(style({ background: 1 })), ['41']);
+  });
+
+  test('encodes a bright foreground colour', () => {
+    assert.deepEqual(styleToParams(style({ foreground: 9 })), ['91']);
+  });
+
+  test('encodes a bright background colour', () => {
+    assert.deepEqual(styleToParams(style({ background: 9 })), ['101']);
+  });
+
+  test('encodes a 256-colour foreground', () => {
+    assert.deepEqual(styleToParams(style({ foreground: 200 })), [
+      '38',
+      '5',
+      '200',
+    ]);
+  });
+
+  test('encodes a truecolor background', () => {
+    assert.deepEqual(styleToParams(style({ background: [10, 20, 30] })), [
+      '48',
+      '2',
+      '0',
+      '10',
+      '20',
+      '30',
+    ]);
+  });
+
+  test('emits foreground before background', () => {
+    assert.deepEqual(styleToParams(style({ foreground: 1, background: 2 })), [
+      '31',
+      '42',
+    ]);
+  });
+
+  test('round-trips through computeStyleForParams', () => {
+    const original = style({
+      bold: true,
+      underline: true,
+      foreground: [1, 2, 3],
+      background: 200,
+    });
+    assert.deepEqual(
+      computeStyleForParams(DEFAULT_STYLE, styleToParams(original)),
+      original,
+    );
+  });
+});
+
+suite('styleToSequence', () => {
+  test('emits a bare reset for the default style', () => {
+    assert.equal(styleToSequence(DEFAULT_STYLE), '\x1b[0m');
+  });
+
+  test('prefixes a reset before the style params', () => {
+    assert.equal(
+      styleToSequence(style({ bold: true, foreground: 1 })),
+      '\x1b[0;1;31m',
+    );
+  });
+});
+
+suite('computeStyledFrame', () => {
+  test('returns plain text when every cell is the default style', () => {
+    assert.equal(
+      computeStyledFrame('ab', [[DEFAULT_STYLE, DEFAULT_STYLE]]),
+      'ab',
+    );
+  });
+
+  test('wraps a styled run in a sequence and a trailing reset', () => {
+    const bold = style({ bold: true });
+    assert.equal(
+      computeStyledFrame('ab', [[bold, bold]]),
+      '\x1b[0;1mab\x1b[0m',
+    );
+  });
+
+  test('only emits a sequence when the style changes', () => {
+    const red = style({ foreground: 1 });
+    assert.equal(
+      computeStyledFrame('abc', [[red, red, DEFAULT_STYLE]]),
+      '\x1b[0;31mab\x1b[0mc',
+    );
+  });
+
+  test('carries an unchanged style across line boundaries', () => {
+    const bold = style({ bold: true });
+    assert.equal(
+      computeStyledFrame('a\nb', [[bold], [bold]]),
+      '\x1b[0;1ma\nb\x1b[0m',
+    );
+  });
+
+  test('falls back to the default style for missing cells', () => {
+    assert.equal(computeStyledFrame('ab', [[]]), 'ab');
   });
 });
