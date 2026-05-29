@@ -426,6 +426,11 @@ export class Renderer implements Iterable<string> {
       return;
     }
 
+    if (code.type === 'OSC' && (code.command === '0' || code.command === '2')) {
+      this.#title = code.params[0] ?? '';
+      return;
+    }
+
     // Captures some special non-printed sequences
     // k = window title
     // P = device control string
