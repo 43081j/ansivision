@@ -11,3 +11,5 @@ export async function renderStringToFrames(input: string): Promise<string[]> {
 }
 
 export { Renderer, RenderStream };
+export type { Frame } from './renderer.js';
+export type { Color, Style } from './style.js';

@@ -1,6 +1,12 @@
 import { Renderer } from './renderer.js';
+import { DEFAULT_STYLE, type Style } from './style.js';
 import { suite, assert, test } from 'vitest';
 import type { CODE } from '@ansi-tools/parser';
+
+const style = (overrides: Partial<Style> = {}): Style => ({
+  ...DEFAULT_STYLE,
+  ...overrides,
+});
 
 const text = (raw: string): CODE => ({ type: 'TEXT', raw, pos: 0 });
 
@@ -847,6 +853,163 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [3, 0]);
       renderer.write(restoreCursor());
       assert.deepEqual(renderer.cursor, [2, 1]);
+    });
+  });
+
+  suite('style tracking', () => {
+    test('plain text has the default style', () => {
+      const renderer = Renderer.fromString('hello');
+      assert.deepEqual(renderer.getStyleAtPosition(0, 0), DEFAULT_STYLE);
+    });
+
+    test('tracks a boolean attribute', () => {
+      const renderer = Renderer.fromString('\x1b[1mhi');
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 0),
+        style({ bold: true }),
+      );
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 1),
+        style({ bold: true }),
+      );
+    });
+
+    test('tracks a foreground colour', () => {
+      const renderer = Renderer.fromString('\x1b[31mab');
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 0),
+        style({ foreground: 1 }),
+      );
+    });
+
+    test('tracks a 256-colour and a truecolor', () => {
+      const renderer = Renderer.fromString(
+        '\x1b[38;5;200mA\x1b[38;2;10;20;30mB',
+      );
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 0),
+        style({ foreground: 200 }),
+      );
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 1),
+        style({ foreground: [10, 20, 30] }),
+      );
+    });
+
+    test('cells with the same style share one interned reference', () => {
+      const renderer = Renderer.fromString('\x1b[31mab');
+      assert.strictEqual(
+        renderer.getStyleAtPosition(0, 0),
+        renderer.getStyleAtPosition(0, 1),
+      );
+    });
+
+    test('style persists across a newline', () => {
+      const renderer = Renderer.fromString('\x1b[34mfoo\nbar');
+      assert.deepEqual(
+        renderer.getStyleAtPosition(1, 0),
+        style({ foreground: 4 }),
+      );
+    });
+
+    test('reset returns subsequent cells to the default style', () => {
+      const renderer = Renderer.fromString('\x1b[31ma\x1b[0mb');
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 0),
+        style({ foreground: 1 }),
+      );
+      assert.deepEqual(renderer.getStyleAtPosition(0, 1), DEFAULT_STYLE);
+    });
+
+    test('out-of-range positions return the default style', () => {
+      const renderer = Renderer.fromString('\x1b[31mab');
+      assert.strictEqual(renderer.getStyleAtPosition(0, 99), DEFAULT_STYLE);
+      assert.strictEqual(renderer.getStyleAtPosition(99, 0), DEFAULT_STYLE);
+      assert.strictEqual(renderer.getStyleAtPosition(0, -1), DEFAULT_STYLE);
+    });
+
+    test('overwriting mid-line preserves the surrounding styles', () => {
+      // red "abcde", move to column 2, write blue "XY"
+      const renderer = Renderer.fromString('\x1b[31mabcde\x1b[3G\x1b[34mXY');
+      assert.equal(renderer.line, 'abXYe');
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 1),
+        style({ foreground: 1 }),
+      );
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 2),
+        style({ foreground: 4 }),
+      );
+      assert.deepEqual(
+        renderer.getStyleAtPosition(0, 4),
+        style({ foreground: 1 }),
+      );
+    });
+
+    suite('getStyleAtOffset', () => {
+      test('maps an offset to its cell style across lines', () => {
+        const renderer = Renderer.fromString('\x1b[34mfoo\n\x1b[31mbar');
+        assert.deepEqual(
+          renderer.getStyleAtOffset(0),
+          style({ foreground: 4 }),
+        );
+        assert.deepEqual(
+          renderer.getStyleAtOffset(4),
+          style({ foreground: 1 }),
+        );
+      });
+
+      test('the newline separator has the default style', () => {
+        const renderer = Renderer.fromString('\x1b[34mfoo\n\x1b[31mbar');
+        assert.strictEqual(renderer.getStyleAtOffset(3), DEFAULT_STYLE);
+      });
+
+      test('out-of-range offsets return the default style', () => {
+        const renderer = Renderer.fromString('\x1b[31mab');
+        assert.strictEqual(renderer.getStyleAtOffset(99), DEFAULT_STYLE);
+        assert.strictEqual(renderer.getStyleAtOffset(-1), DEFAULT_STYLE);
+      });
+    });
+
+    suite('erase', () => {
+      test('erasing a line clears its stored styles', () => {
+        const renderer = Renderer.fromString('\x1b[31mOLD\x1b[2K');
+        assert.strictEqual(renderer.getStyleAtPosition(0, 0), DEFAULT_STYLE);
+      });
+
+      test('rewriting an erased line picks up the active style', () => {
+        const renderer = Renderer.fromString('\x1b[31mOLD\x1b[2K\x1b[1Gnew');
+        assert.deepEqual(
+          renderer.getStyleAtPosition(0, 0),
+          style({ foreground: 1 }),
+        );
+      });
+
+      test('rewriting after a reset uses the default style', () => {
+        const renderer = Renderer.fromString('\x1b[31mOLD\x1b[2K\x1b[0mnew');
+        assert.deepEqual(renderer.getStyleAtPosition(0, 0), DEFAULT_STYLE);
+      });
+
+      test('erase to start of line fills with default-styled spaces', () => {
+        // red bg "ABCDE", move to column 2, erase to start of line
+        const renderer = Renderer.fromString('\x1b[41mABCDE\x1b[3G\x1b[1K');
+        assert.equal(renderer.line, '   DE');
+        assert.strictEqual(renderer.getStyleAtPosition(0, 0), DEFAULT_STYLE);
+        assert.deepEqual(
+          renderer.getStyleAtPosition(0, 3),
+          style({ background: 1 }),
+        );
+      });
+
+      test('erase to end of line truncates the stored styles', () => {
+        const renderer = Renderer.fromString('\x1b[31mABCDE\x1b[3G\x1b[0K');
+        assert.equal(renderer.line, 'AB');
+        assert.deepEqual(
+          renderer.getStyleAtPosition(0, 1),
+          style({ foreground: 1 }),
+        );
+        assert.strictEqual(renderer.getStyleAtPosition(0, 2), DEFAULT_STYLE);
+      });
     });
   });
 });
