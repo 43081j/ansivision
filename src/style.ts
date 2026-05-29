@@ -67,6 +67,51 @@ export const readExtendedColor = (
   return [null, 0];
 };
 
+const colorToParams = (color: Color, background: boolean): string[] => {
+  if (typeof color === 'number') {
+    if (color < 8) {
+      return [String((background ? 40 : 30) + color)];
+    }
+    if (color < 16) {
+      return [String((background ? 100 : 90) + color - 8)];
+    }
+    return [background ? '48' : '38', '5', String(color)];
+  }
+  return [
+    background ? '48' : '38',
+    '2',
+    '0',
+    String(color[0]),
+    String(color[1]),
+    String(color[2]),
+  ];
+};
+
+export const styleToParams = (style: Style): string[] => {
+  const params: string[] = [];
+
+  if (style.bold) params.push('1');
+  if (style.dim) params.push('2');
+  if (style.italic) params.push('3');
+  if (style.underline) params.push('4');
+  if (style.blink) params.push('5');
+  if (style.inverse) params.push('7');
+  if (style.hidden) params.push('8');
+  if (style.strikethrough) params.push('9');
+  if (style.foreground !== null) {
+    params.push(...colorToParams(style.foreground, false));
+  }
+  if (style.background !== null) {
+    params.push(...colorToParams(style.background, true));
+  }
+
+  return params;
+};
+
+export const styleToSequence = (style: Style): string => {
+  return `\x1b[${['0', ...styleToParams(style)].join(';')}m`;
+};
+
 export const createStyleCollection = (
   length: number,
   style: Style,
@@ -196,4 +241,35 @@ export function computeStyleForParams(
   }
 
   return next;
+}
+
+export function computeStyledFrame(frame: string, styles: Style[][]): string {
+  const lineBuffers = frame.split('\n');
+  let result = '';
+  let currentStyle: Style = DEFAULT_STYLE;
+
+  for (let line = 0; line < lineBuffers.length; line++) {
+    if (line > 0) {
+      result += '\n';
+    }
+
+    const lineBuffer = lineBuffers[line]!;
+
+    for (let col = 0; col < lineBuffer.length; col++) {
+      const style = styles[line]?.[col] ?? DEFAULT_STYLE;
+
+      if (style !== currentStyle) {
+        result += styleToSequence(style);
+        currentStyle = style;
+      }
+
+      result += lineBuffer[col];
+    }
+  }
+
+  if (currentStyle !== DEFAULT_STYLE) {
+    result += '\x1b[0m';
+  }
+
+  return result;
 }

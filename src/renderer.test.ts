@@ -225,8 +225,8 @@ suite('Renderer', () => {
         '\x1bkone\x1b\\a\x1b[2J\x1bktwo\x1b\\b',
       );
       assert.deepEqual(renderer.frameObjects, [
-        { contents: 'a', title: 'one' },
-        { contents: 'b', title: 'two' },
+        { contents: 'a', title: 'one', styles: [[DEFAULT_STYLE]] },
+        { contents: 'b', title: 'two', styles: [[DEFAULT_STYLE]] },
       ]);
     });
 
@@ -1010,6 +1010,25 @@ suite('Renderer', () => {
         );
         assert.strictEqual(renderer.getStyleAtPosition(0, 2), DEFAULT_STYLE);
       });
+    });
+  });
+
+  suite('currentStyledFrame', () => {
+    test('returns plain text unchanged', () => {
+      const renderer = Renderer.fromString('hello');
+      assert.equal(renderer.currentStyledFrame, 'hello');
+    });
+
+    test('re-adds the style sequences', () => {
+      const renderer = Renderer.fromString('\x1b[1mhi');
+      assert.equal(renderer.currentStyledFrame, '\x1b[0;1mhi\x1b[0m');
+    });
+
+    test('reflects the currently selected frame', () => {
+      const renderer = Renderer.fromString('\x1b[31mred\x1b[2J\x1b[0mplain');
+      assert.equal(renderer.currentStyledFrame, '\x1b[0;31mred\x1b[0m');
+      renderer.nextFrame();
+      assert.equal(renderer.currentStyledFrame, 'plain');
     });
   });
 });
