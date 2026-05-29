@@ -29,3 +29,7 @@ export const isEraseCommand = (code: CODE): code is CONTROL_CODE => {
     (code.type === 'ESC' && code.command === 'c')
   );
 };
+
+export const isStyleCommand = (code: CODE): code is CONTROL_CODE => {
+  return code.type === 'CSI' && code.command === 'm';
+};

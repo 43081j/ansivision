@@ -1,5 +1,13 @@
 import { CODE, CONTROL_CODE, parse } from '@ansi-tools/parser';
-import { isCursorCommand, isEraseCommand } from './commands.js';
+import { isCursorCommand, isEraseCommand, isStyleCommand } from './commands.js';
+import {
+  computeStyleForParams,
+  computeStyleKey,
+  createStyleCollection,
+  DEFAULT_STYLE,
+  DEFAULT_STYLE_KEY,
+  Style,
+} from './style.js';
 
 export interface Frame {
   contents: string;
@@ -18,6 +26,12 @@ export class Renderer implements Iterable<string> {
   #skipUntilStringTerminator: boolean = false;
   #capturingTitle: boolean = false;
   #title: string = '';
+  // style buffer of [line][column] = style
+  #styleBuffer: Style[][] = [];
+  #currentStyle: Style = DEFAULT_STYLE;
+  #styleCache: Map<string, Style> = new Map([
+    [DEFAULT_STYLE_KEY, DEFAULT_STYLE],
+  ]);
 
   static fromString(input: string): Renderer {
     const ast = parse(input);
@@ -55,6 +69,26 @@ export class Renderer implements Iterable<string> {
 
   get line(): string {
     return this.#buffer[this.#cursorY] || '';
+  }
+
+  getStyleAtPosition(line: number, col: number): Style {
+    return this.#styleBuffer[line]?.[col] ?? DEFAULT_STYLE;
+  }
+
+  getStyleAtOffset(offset: number): Style {
+    let remaining = offset;
+
+    for (let y = 0; y < this.#buffer.length; y++) {
+      const length = this.#buffer[y]!.length;
+
+      if (remaining < length) {
+        return this.getStyleAtPosition(y, remaining);
+      }
+
+      remaining -= length + 1;
+    }
+
+    return DEFAULT_STYLE;
   }
 
   stepFrame(delta: number): void {
@@ -99,6 +133,7 @@ export class Renderer implements Iterable<string> {
     const newY = this.#cursorY + 1;
     while (this.#buffer.length <= newY) {
       this.#buffer.push('');
+      this.#styleBuffer.push([]);
     }
     this.#cursorY = newY;
   }
@@ -116,20 +151,46 @@ export class Renderer implements Iterable<string> {
     this.#cursorX = Math.max(0, this.#cursorX - count);
   }
 
+  #getCachedStyle(style: Style): Style {
+    if (style === DEFAULT_STYLE) {
+      return DEFAULT_STYLE;
+    }
+    const key = computeStyleKey(style);
+    const cached = this.#styleCache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const frozen = Object.freeze(style);
+    this.#styleCache.set(key, frozen);
+    return frozen;
+  }
+
+  #applyStyle(params: string[]): void {
+    const newStyle = computeStyleForParams(this.#currentStyle, params);
+    this.#currentStyle = this.#getCachedStyle(newStyle);
+  }
+
   #writeChunk(part: string): void {
     if (!part) {
       return;
     }
     const bufferIndex = this.#cursorY;
     const existingLine = this.#buffer[bufferIndex];
+    const partStyles = createStyleCollection(part.length, this.#currentStyle);
 
     if (existingLine !== undefined) {
       const prefix = existingLine.slice(0, this.#cursorX);
       const suffix = existingLine.slice(this.#cursorX + part.length);
       this.#buffer[bufferIndex] = prefix + part + suffix;
+
+      const styleRow = this.#styleBuffer[bufferIndex] ?? [];
+      this.#styleBuffer[bufferIndex] = styleRow
+        .slice(0, this.#cursorX)
+        .concat(partStyles, styleRow.slice(this.#cursorX + part.length));
       this.#cursorForward(part.length);
     } else {
       this.#buffer.push(part);
+      this.#styleBuffer.push(partStyles);
       this.#cursorTo(part.length, bufferIndex);
     }
   }
@@ -152,6 +213,7 @@ export class Renderer implements Iterable<string> {
           const newY = this.#cursorY + 1;
           while (this.#buffer.length <= newY) {
             this.#buffer.push('');
+            this.#styleBuffer.push([]);
           }
           this.#cursorTo(this.#cursorX, newY);
         }
@@ -233,6 +295,7 @@ export class Renderer implements Iterable<string> {
   #eraseAll(): void {
     this.#pushFrame();
     this.#buffer = [];
+    this.#styleBuffer = [];
     this.#cursorTo(0, 0);
   }
 
@@ -249,6 +312,7 @@ export class Renderer implements Iterable<string> {
   #eraseLine(): void {
     this.#pushFrame();
     this.#buffer[this.#cursorY] = '';
+    this.#styleBuffer[this.#cursorY] = [];
     this.#cursorTo(0, this.#cursorY);
   }
 
@@ -261,6 +325,9 @@ export class Renderer implements Iterable<string> {
     }
 
     this.#buffer[this.#cursorY] = line.slice(0, this.#cursorX);
+    this.#styleBuffer[this.#cursorY] = (
+      this.#styleBuffer[this.#cursorY] ?? []
+    ).slice(0, this.#cursorX);
   }
 
   #eraseToStartOfLine(): void {
@@ -273,6 +340,10 @@ export class Renderer implements Iterable<string> {
 
     const end = Math.min(this.#cursorX + 1, line.length);
     this.#buffer[this.#cursorY] = ' '.repeat(end) + line.slice(end);
+    this.#styleBuffer[this.#cursorY] = createStyleCollection(
+      end,
+      DEFAULT_STYLE,
+    ).concat((this.#styleBuffer[this.#cursorY] ?? []).slice(end));
   }
 
   #eraseToEnd(): void {
@@ -281,6 +352,7 @@ export class Renderer implements Iterable<string> {
     this.#eraseToEndOfLine();
     this.#suppressNextPush = false;
     this.#buffer.splice(this.#cursorY + 1);
+    this.#styleBuffer.splice(this.#cursorY + 1);
   }
 
   #eraseToStart(): void {
@@ -289,6 +361,7 @@ export class Renderer implements Iterable<string> {
     this.#eraseToStartOfLine();
     this.#suppressNextPush = false;
     this.#buffer.splice(0, this.#cursorY);
+    this.#styleBuffer.splice(0, this.#cursorY);
     this.#cursorTo(this.#cursorX, 0);
   }
 
@@ -358,7 +431,9 @@ export class Renderer implements Iterable<string> {
       return;
     }
 
-    if (isCursorCommand(code)) {
+    if (isStyleCommand(code)) {
+      this.#applyStyle(code.params);
+    } else if (isCursorCommand(code)) {
       this.#cursorByCommand(code);
     } else if (isEraseCommand(code)) {
       this.#eraseByCommand(code);
