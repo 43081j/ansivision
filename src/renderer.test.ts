@@ -636,18 +636,26 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [2, 0]);
     });
 
-    test('cursor to clamps y', () => {
+    test('writing at an absolute position pads with blanks', () => {
+      const renderer = new Renderer();
+      renderer.write(cursorTo(3, 2));
+      renderer.write(text('hi'));
+      assert.deepEqual(renderer.frames, ['\n\n   hi']);
+      assert.deepEqual(renderer.cursor, [5, 2]);
+    });
+
+    test('cursor to moves beyond the buffer', () => {
       const renderer = new Renderer();
       renderer.write(text('hello\nworld'));
       renderer.write(cursorTo(0, 10));
-      assert.deepEqual(renderer.cursor, [0, 1]);
+      assert.deepEqual(renderer.cursor, [0, 10]);
     });
 
-    test('cursor to clamps x', () => {
+    test('cursor to moves beyond the end of a line', () => {
       const renderer = new Renderer();
       renderer.write(text('hi\nworld'));
       renderer.write(cursorTo(10, 0));
-      assert.deepEqual(renderer.cursor, [2, 0]);
+      assert.deepEqual(renderer.cursor, [10, 0]);
     });
 
     test('cursor to with only x param keeps y at 0', () => {
@@ -688,19 +696,19 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [1, 1]);
     });
 
-    test('cursor down clamps at bottom', () => {
+    test('cursor down moves beyond the buffer', () => {
       const renderer = new Renderer();
       renderer.write(text('a\nb\nc'));
       renderer.write(cursorMoveY(-2));
       renderer.write(cursorMoveY(99));
-      assert.deepEqual(renderer.cursor, [1, 2]);
+      assert.deepEqual(renderer.cursor, [1, 99]);
     });
 
-    test('cursor down at bottom is a no-op', () => {
+    test('cursor down past the bottom keeps moving', () => {
       const renderer = new Renderer();
       renderer.write(text('a\nb\nc'));
       renderer.write(cursorMoveY(1));
-      assert.deepEqual(renderer.cursor, [1, 2]);
+      assert.deepEqual(renderer.cursor, [1, 3]);
     });
 
     test('cursor forward moves forward', () => {
@@ -711,19 +719,19 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [2, 0]);
     });
 
-    test('cursor forward clamps at end of line', () => {
+    test('cursor forward moves beyond the end of line', () => {
       const renderer = new Renderer();
       renderer.write(text('hello'));
       renderer.write(cursorMoveX(-5));
       renderer.write(cursorMoveX(99));
-      assert.deepEqual(renderer.cursor, [5, 0]);
+      assert.deepEqual(renderer.cursor, [99, 0]);
     });
 
-    test('cursor forward at end of line is a no-op', () => {
+    test('cursor forward past the end of line keeps moving', () => {
       const renderer = new Renderer();
       renderer.write(text('hello'));
       renderer.write(cursorMoveX(1));
-      assert.deepEqual(renderer.cursor, [5, 0]);
+      assert.deepEqual(renderer.cursor, [6, 0]);
     });
 
     test('cursor backward moves backward', () => {
@@ -757,19 +765,19 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [0, 1]);
     });
 
-    test('cursor next line clamps at bottom', () => {
+    test('cursor next line moves beyond the bottom', () => {
       const renderer = new Renderer();
       renderer.write(text('a\nb\nc'));
       renderer.write(cursorMoveY(-2));
       renderer.write(cursorNextLine(99));
-      assert.deepEqual(renderer.cursor, [0, 2]);
+      assert.deepEqual(renderer.cursor, [0, 99]);
     });
 
-    test('cursor next line at bottom is a no-op on row', () => {
+    test('cursor next line past the bottom keeps moving', () => {
       const renderer = new Renderer();
       renderer.write(text('hello'));
       renderer.write(cursorNextLine(1));
-      assert.deepEqual(renderer.cursor, [0, 0]);
+      assert.deepEqual(renderer.cursor, [0, 1]);
     });
 
     test('cursor prev line moves to start of line above', () => {
@@ -801,11 +809,11 @@ suite('Renderer', () => {
       assert.deepEqual(renderer.cursor, [2, 0]);
     });
 
-    test('cursor column clamps at end of line', () => {
+    test('cursor column moves beyond the end of line', () => {
       const renderer = new Renderer();
       renderer.write(text('hi'));
       renderer.write(cursorColumn(99));
-      assert.deepEqual(renderer.cursor, [2, 0]);
+      assert.deepEqual(renderer.cursor, [99, 0]);
     });
 
     test('cursor column to 0 goes to start of line', () => {

@@ -142,7 +142,7 @@ export class Renderer implements Iterable<string> {
   }
 
   #cursorDown(count: number): void {
-    this.#cursorY = Math.min(this.#buffer.length - 1, this.#cursorY + count);
+    this.#cursorY = this.#cursorY + count;
   }
 
   #cursorDownAppend(): void {
@@ -155,12 +155,12 @@ export class Renderer implements Iterable<string> {
   }
 
   #cursorTo(x: number, y: number): void {
-    this.#cursorY = Math.max(0, Math.min(this.#buffer.length - 1, y));
-    this.#cursorX = Math.max(0, Math.min(this.line.length, x));
+    this.#cursorY = Math.max(0, y);
+    this.#cursorX = Math.max(0, x);
   }
 
   #cursorForward(count: number): void {
-    this.#cursorX = Math.min(this.line.length, this.#cursorX + count);
+    this.#cursorX = this.#cursorX + count;
   }
 
   #cursorBackward(count: number): void {
@@ -191,24 +191,34 @@ export class Renderer implements Iterable<string> {
       return;
     }
     const bufferIndex = this.#cursorY;
-    const existingLine = this.#buffer[bufferIndex];
+
+    // Materialize blank rows up to the cursor row.
+    while (this.#buffer.length <= bufferIndex) {
+      this.#buffer.push('');
+      this.#styleBuffer.push([]);
+    }
+
+    const existingLine = this.#buffer[bufferIndex]!;
+    const styleRow = this.#styleBuffer[bufferIndex] ?? [];
     const partStyles = createStyleCollection(part.length, this.#currentStyle);
 
-    if (existingLine !== undefined) {
-      const prefix = existingLine.slice(0, this.#cursorX);
-      const suffix = existingLine.slice(this.#cursorX + part.length);
-      this.#buffer[bufferIndex] = prefix + part + suffix;
+    // Pad the row with blanks when the cursor is past the end of the line.
+    const padding = Math.max(0, this.#cursorX - existingLine.length);
+    const paddingStyles = createStyleCollection(padding, DEFAULT_STYLE);
 
-      const styleRow = this.#styleBuffer[bufferIndex] ?? [];
-      this.#styleBuffer[bufferIndex] = styleRow
-        .slice(0, this.#cursorX)
-        .concat(partStyles, styleRow.slice(this.#cursorX + part.length));
-      this.#cursorForward(part.length);
-    } else {
-      this.#buffer.push(part);
-      this.#styleBuffer.push(partStyles);
-      this.#cursorTo(part.length, bufferIndex);
-    }
+    const prefix = existingLine.slice(0, this.#cursorX) + ' '.repeat(padding);
+    const suffix = existingLine.slice(this.#cursorX + part.length);
+    this.#buffer[bufferIndex] = prefix + part + suffix;
+
+    this.#styleBuffer[bufferIndex] = styleRow
+      .slice(0, this.#cursorX)
+      .concat(
+        paddingStyles,
+        partStyles,
+        styleRow.slice(this.#cursorX + part.length),
+      );
+
+    this.#cursorForward(part.length);
   }
 
   #writeText(text: string): void {
@@ -231,7 +241,7 @@ export class Renderer implements Iterable<string> {
             this.#buffer.push('');
             this.#styleBuffer.push([]);
           }
-          this.#cursorTo(this.#cursorX, newY);
+          this.#cursorTo(0, newY);
         }
       } else {
         chunk += ch;
