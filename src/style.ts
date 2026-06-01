@@ -243,19 +243,53 @@ export function computeStyleForParams(
   return next;
 }
 
-export function computeStyledFrame(frame: string, styles: Style[][]): string {
+export interface StyledFrameOptions {
+  /**
+   * Maximum number of columns to render. Lines longer than this are clipped.
+   */
+  columns?: number;
+  /**
+   * Maximum number of rows to render. Rows beyond this are clipped.
+   */
+  rows?: number;
+  /**
+   * Column to start rendering from. Only applies when {@link columns} is set.
+   */
+  scrollX?: number;
+  /**
+   * Row to start rendering from. Only applies when {@link rows} is set.
+   */
+  scrollY?: number;
+}
+
+export function computeStyledFrame(
+  frame: string,
+  styles: Style[][],
+  options?: StyledFrameOptions,
+): string {
   const lineBuffers = frame.split('\n');
   let result = '';
   let currentStyle: Style = DEFAULT_STYLE;
 
-  for (let line = 0; line < lineBuffers.length; line++) {
-    if (line > 0) {
+  const rowStart = options?.rows !== undefined ? (options.scrollY ?? 0) : 0;
+  const rowEnd =
+    options?.rows !== undefined
+      ? Math.min(lineBuffers.length, rowStart + options.rows)
+      : lineBuffers.length;
+  const colStart = options?.columns !== undefined ? (options.scrollX ?? 0) : 0;
+
+  for (let line = rowStart; line < rowEnd; line++) {
+    if (line > rowStart) {
       result += '\n';
     }
 
     const lineBuffer = lineBuffers[line]!;
+    const colEnd =
+      options?.columns !== undefined
+        ? Math.min(lineBuffer.length, colStart + options.columns)
+        : lineBuffer.length;
 
-    for (let col = 0; col < lineBuffer.length; col++) {
+    for (let col = colStart; col < colEnd; col++) {
       const style = styles[line]?.[col] ?? DEFAULT_STYLE;
 
       if (style !== currentStyle) {
