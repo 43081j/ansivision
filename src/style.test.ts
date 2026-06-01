@@ -396,4 +396,64 @@ suite('computeStyledFrame', () => {
   test('falls back to the default style for missing cells', () => {
     assert.equal(computeStyledFrame('ab', [[]]), 'ab');
   });
+
+  test('clips lines to the given column count', () => {
+    assert.equal(computeStyledFrame('abcdef', [[]], { columns: 3 }), 'abc');
+  });
+
+  test('clips rows to the given row count', () => {
+    assert.equal(
+      computeStyledFrame('a\nb\nc', [[], [], []], { rows: 2 }),
+      'a\nb',
+    );
+  });
+
+  test('does not emit styles for clipped cells', () => {
+    const red = style({ foreground: 1 });
+    assert.equal(
+      computeStyledFrame('abc', [[DEFAULT_STYLE, DEFAULT_STYLE, red]], {
+        columns: 2,
+      }),
+      'ab',
+    );
+  });
+
+  test('scrolls the column window when columns is set', () => {
+    assert.equal(
+      computeStyledFrame('abcdef', [[]], { columns: 3, scrollX: 2 }),
+      'cde',
+    );
+  });
+
+  test('scrolls the row window when rows is set', () => {
+    assert.equal(
+      computeStyledFrame('a\nb\nc\nd', [[], [], [], []], {
+        rows: 2,
+        scrollY: 1,
+      }),
+      'b\nc',
+    );
+  });
+
+  test('ignores scrollX when columns is not set', () => {
+    assert.equal(computeStyledFrame('abc', [[]], { scrollX: 2 }), 'abc');
+  });
+
+  test('ignores scrollY when rows is not set', () => {
+    assert.equal(
+      computeStyledFrame('a\nb\nc', [[], [], []], { scrollY: 1 }),
+      'a\nb\nc',
+    );
+  });
+
+  test('emits the style of the first visible scrolled cell', () => {
+    const red = style({ foreground: 1 });
+    assert.equal(
+      computeStyledFrame('abc', [[DEFAULT_STYLE, red, red]], {
+        columns: 2,
+        scrollX: 1,
+      }),
+      '\x1b[0;31mbc\x1b[0m',
+    );
+  });
 });

@@ -8,6 +8,7 @@ import {
   DEFAULT_STYLE,
   DEFAULT_STYLE_KEY,
   Style,
+  StyledFrameOptions,
 } from './style.js';
 
 export interface Frame {
@@ -51,13 +52,17 @@ export class Renderer implements Iterable<string> {
   }
 
   get currentStyledFrame(): string {
+    return this.getStyledFrame();
+  }
+
+  getStyledFrame(options?: StyledFrameOptions): string {
     const frame = this.frameObjects[this.#currentFrame];
 
     if (!frame) {
       return '';
     }
 
-    return computeStyledFrame(frame.contents, frame.styles);
+    return computeStyledFrame(frame.contents, frame.styles, options);
   }
 
   get frames(): string[] {
