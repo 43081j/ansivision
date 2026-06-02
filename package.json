@@ -52,6 +52,6 @@
     "vitest": "^4.1.5"
   },
   "dependencies": {
-    "@ansi-tools/parser": "^1.0.15"
+    "@ansi-tools/parser": "^1.0.17"
   }
 }
